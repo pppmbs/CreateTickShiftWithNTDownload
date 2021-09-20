@@ -91,7 +91,7 @@ namespace CreateTickShiftWithNTDownload
             {
                 // first spilt into daily files
                 List<String> dailyDataFiles = SplitESFileIntoDailyDataFiles(inESFile);
-                IEnumerable inFiles = dailyDataFiles;
+                IEnumerable inDailyDataFiles = dailyDataFiles;
 
                 // the slidingTotal decides how many versions of tick shift data files are there
                 for (int slidingNum = 1; slidingNum < Constants.slidingTotal; slidingNum++)
@@ -99,26 +99,30 @@ namespace CreateTickShiftWithNTDownload
                     string path = Constants.TickCount + "-NT-ticks-Shift\\" + Path.GetFileNameWithoutExtension(inESFile) + "." + slidingNum.ToString() + Path.GetExtension(inESFile);
                     File.Delete(path);
 
-                    // for each daily file, shift the ticks (shifting window decided by slidingNum*slidingWindow) and write the shifted data into ONE file for each tick shift version
-                    foreach (String inFile in inFiles)
+                    using (StreamWriter streamwriter = new StreamWriter(path, true, Encoding.UTF8, 65536))
                     {
-                        using (var sr = new StreamReader(inFile))
+                        // for each daily file, shift the ticks (shifting window decided by slidingNum*slidingWindow) and write the shifted data into ONE file for each tick shift version
+                        foreach (String inFile in inDailyDataFiles)
                         {
-                            var reader = new CsvReader(sr, CultureInfo.InvariantCulture);
-                            List<DataRecord> ticks = new List<DataRecord>();
-
-                            //CSVReader will now read the whole file into an enumerable
-                            IEnumerable records = reader.GetRecords<DataRecord>().ToList();
-
-                            int skip = 1;
-                            foreach (DataRecord tick in records)
+                            using (var sr = new StreamReader(inFile))
                             {
-                                if (skip > slidingNum * Constants.slidingWindow)
+                                var reader = new CsvReader(sr, CultureInfo.InvariantCulture);
+                                List<DataRecord> ticks = new List<DataRecord>();
+
+                                //CSVReader will now read the whole file into an enumerable
+                                IEnumerable records = reader.GetRecords<DataRecord>().ToList();
+
+                                int skip = 1;
+                                foreach (DataRecord tick in records)
                                 {
-                                    string bufString = tick.Date + " " + tick.Time + " " + tick.Fraction + ";" + tick.Bid + ";" + tick.Ask + ";" + tick.Volume;
-                                    File.AppendAllText(path, bufString + Environment.NewLine);
+                                    if (skip > slidingNum * Constants.slidingWindow)
+                                    {
+                                        string bufString = tick.Date + " " + tick.Time + " " + tick.Fraction + ";" + tick.Bid + ";" + tick.Ask + ";" + tick.Volume;
+                                        //File.AppendAllText(path, bufString + Environment.NewLine);
+                                        streamwriter.WriteLine(bufString);
+                                    }
+                                    skip++;
                                 }
-                                skip++;
                             }
                         }
                     }
